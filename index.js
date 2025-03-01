@@ -79,12 +79,12 @@ async function processDocument(doc) {
       if (item.image) {
         newUrl = await uploadImageToS3(restaurantId, item.id, item.image);
       } else {
-        newUrl = `https://gobbl-restaurant-images-bucket.s3.ap-south-1.amazonaws.com/landscape-placeholder-svgrepo-co.jpg`;
+        newUrl = await uploadImageToS3(restaurantId, item.id, `https://gobbl-restaurant-images-bucket.s3.ap-south-1.amazonaws.com/landscape-placeholder-svgrepo-co.jpg`);
         console.log(`No original image for restaurantId ${restaurantId}, item ${item.id}. Setting URL to ${newUrl}`);
       }
     } catch (err) {
       console.error(`Failed to update image for restaurantId ${restaurantId}, item ${item.id}:`, err.message);
-      newUrl = `https://gobbl-restaurant-images-bucket.s3.ap-south-1.amazonaws.com/landscape-placeholder-svgrepo-co.jpg`;
+      newUrl = await uploadImageToS3(restaurantId, item.id, `https://gobbl-restaurant-images-bucket.s3.ap-south-1.amazonaws.com/landscape-placeholder-svgrepo-co.jpg`);
     }
     updatedItems.push({ ...item, image: newUrl });
   }
@@ -97,7 +97,7 @@ async function updateRestaurantMenusImages() {
   try {
     const collection = await RestaurantMenu.aggregate([
       {
-        $skip: 101
+        $skip: 129
       },
       {
         $project: {
@@ -108,7 +108,7 @@ async function updateRestaurantMenusImages() {
       }
     ]);
     console.log("fetched from db");
-    let count = 101;
+    let count = 129;
     for (const doc of collection) {
       try {
         await processDocument(doc);
