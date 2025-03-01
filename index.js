@@ -95,7 +95,7 @@ async function processDocument(doc) {
 
 async function updateRestaurantMenusImages() {
   try {
-    const collection = RestaurantMenu.aggregate([
+    const collection = await RestaurantMenu.aggregate([
       {
         $skip: 101
       },
