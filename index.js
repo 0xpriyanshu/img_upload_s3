@@ -15,6 +15,12 @@ AWS.config.update({
 const s3 = new AWS.S3();
 
 const mongoUri = process.env.MONGO_URI;
+if (!mongoUri) {
+  console.error("MONGO_URI is not set in the environment.");
+  process.exit(1);
+}
+const DB_NAME = 'agentic';
+const COLLECTION_NAME = 'restaurantmenus';
 
 mongoose
   .connect(process.env.MONGODB_URL, {
@@ -120,8 +126,8 @@ async function updateRestaurantMenusImages() {
   } finally {
     mongoose.connection.close();
     process.exit(0);
-    console.log("Disconnected from MongoDB.");
   }
 }
 
 updateRestaurantMenusImages();
+
