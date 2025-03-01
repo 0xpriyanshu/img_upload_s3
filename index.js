@@ -18,7 +18,7 @@ if (!mongoUri) {
   console.error("MONGO_URI is not set in the environment.");
   process.exit(1);
 }
-const DB_NAME = 'Agentic';
+const DB_NAME = 'agentic';
 const COLLECTION_NAME = 'restaurantmenus';
 
 /**
