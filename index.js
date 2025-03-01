@@ -1,8 +1,9 @@
-require('dotenv').config(); 
+require('dotenv').config();
 
-const { MongoClient } = require('mongodb');
 const axios = require('axios');
 const AWS = require('aws-sdk');
+const mongoose = require('mongoose');
+const RestaurantMenu = require('./models/Menu');
 
 const BUCKET_NAME = 'gobbl-restaurant-images-bucket';
 const REGION = 'ap-south-1';
@@ -14,13 +15,13 @@ AWS.config.update({
 const s3 = new AWS.S3();
 
 const mongoUri = process.env.MONGO_URI;
-if (!mongoUri) {
-  console.error("MONGO_URI is not set in the environment.");
-  process.exit(1);
-}
-const DB_NAME = 'Agentic';
-const COLLECTION_NAME = 'restaurantmenus';
 
+mongoose
+  .connect(process.env.MONGODB_URL, {
+    user: process.env.MONGODB_USER,
+    pass: process.env.MONGODB_PASS,
+  }).then(console.log("connnted"))
+  .catch((err) => console.log(err));
 /**
  * Downloads an image from the given URL and uploads it to S3.
  * The file is stored under a folder named with the restaurantId,
@@ -58,7 +59,7 @@ async function uploadImageToS3(restaurantId, itemId, imageUrl) {
  * @param {Object} doc - The restaurant menu document.
  * @param {Object} collection - The MongoDB collection.
  */
-async function processDocument(doc, collection) {
+async function processDocument(doc) {
   const restaurantId = doc.restaurantId;
   if (!restaurantId || !Array.isArray(doc.items)) {
     console.warn(`Skipping document ${doc._id} due to missing restaurantId or items.`);
@@ -72,34 +73,39 @@ async function processDocument(doc, collection) {
       if (item.image) {
         newUrl = await uploadImageToS3(restaurantId, item.id, item.image);
       } else {
-        newUrl = `https://${BUCKET_NAME}.s3.${REGION}.amazonaws.com/${restaurantId}/${restaurantId}-${item.id}.jpg`;
+        newUrl = `https://gobbl-restaurant-images-bucket.s3.ap-south-1.amazonaws.com/landscape-placeholder-svgrepo-co.jpg`;
         console.log(`No original image for restaurantId ${restaurantId}, item ${item.id}. Setting URL to ${newUrl}`);
       }
     } catch (err) {
       console.error(`Failed to update image for restaurantId ${restaurantId}, item ${item.id}:`, err.message);
-      newUrl = `https://${BUCKET_NAME}.s3.${REGION}.amazonaws.com/${restaurantId}/${restaurantId}-${item.id}.jpg`;
+      newUrl = `https://gobbl-restaurant-images-bucket.s3.ap-south-1.amazonaws.com/landscape-placeholder-svgrepo-co.jpg`;
     }
     updatedItems.push({ ...item, image: newUrl });
   }
 
-  await collection.updateOne({ _id: doc._id }, { $set: { items: updatedItems } });
+  await RestaurantMenu.findOneAndUpdate({ _id: doc._id }, { $set: { items: updatedItems } });
   console.log(`Updated document for restaurantId ${restaurantId}`);
 }
 
 async function updateRestaurantMenusImages() {
-  const client = new MongoClient(mongoUri, { useNewUrlParser: true, useUnifiedTopology: true });
   try {
-    await client.connect();
-    console.log("Connected to MongoDB");
-    const db = client.db(DB_NAME);
-    const collection = db.collection(COLLECTION_NAME);
-
-    const cursor = collection.find({});
-    let count = 0;
-    while (await cursor.hasNext()) {
-      const doc = await cursor.next();
+    const collection = RestaurantMenu.aggregate([
+      {
+        $skip: 101
+      },
+      {
+        $project: {
+          _id: 1,
+          restaurantId: 1,
+          items: 1
+        }
+      }
+    ]);
+    console.log("fetched from db");
+    let count = 101;
+    for (const doc of collection) {
       try {
-        await processDocument(doc, collection);
+        await processDocument(doc);
       } catch (error) {
         console.error(`Error processing document ${doc._id}:`, error.message);
       }
@@ -112,7 +118,8 @@ async function updateRestaurantMenusImages() {
   } catch (error) {
     console.error("Error updating restaurant menus images:", error.message);
   } finally {
-    await client.close();
+    mongoose.connection.close();
+    process.exit(0);
     console.log("Disconnected from MongoDB.");
   }
 }
